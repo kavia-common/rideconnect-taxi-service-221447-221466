@@ -13,6 +13,7 @@ import psycopg2.extras
 
 # Import blueprints and realtime namespace registration
 from .routes.health import blp as health_blp
+from .routes.auth import blp as auth_blp
 
 # PUBLIC_INTERFACE
 def create_app() -> Tuple[Flask, Api, SocketIO]:
@@ -58,6 +59,7 @@ def create_app() -> Tuple[Flask, Api, SocketIO]:
     # API / Blueprints
     api = Api(app)
     api.register_blueprint(health_blp)
+    api.register_blueprint(auth_blp)
 
     # Register Socket.IO namespaces/handlers
     from .realtime.socket import register_namespaces
