@@ -46,6 +46,8 @@ def create_app() -> Tuple[Flask, Api, SocketIO]:
     jwt = JWTManager(app)
 
     # Socket.IO with eventlet async mode
+    # Socket.IO with eventlet async mode
+    # Note: Engine.IO path defaults to "/socket.io". Keep frontend client in sync.
     socketio = SocketIO(
         app,
         cors_allowed_origins=os.getenv("SOCKETIO_CORS_ORIGINS", "*").split(","),
