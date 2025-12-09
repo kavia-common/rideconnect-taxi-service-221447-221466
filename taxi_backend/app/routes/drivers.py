@@ -7,6 +7,8 @@ from flask_jwt_extended import jwt_required, get_jwt_identity
 from marshmallow import Schema, fields
 
 from ..models import query_one, execute
+from .. import app
+from ..realtime.socket import emit_driver_location_update, emit_ride_status_update
 
 # Drivers Blueprint
 blp = Blueprint(
@@ -175,6 +177,19 @@ class DriverAvailabilityView(MethodView):
         if updated <= 0:
             abort(500, message="Failed to update availability")
 
+        # Emit a generic ride_status_update for rides assigned to this driver to reflect driver online/offline if needed
+        try:
+            socketio = app.extensions["socketio"]
+            # Notify rooms subscribed to driver status if any rides are in assigned/ongoing with this driver
+            affected = query_one(
+                "SELECT id FROM rides WHERE driver_id = %s AND status IN ('assigned','ongoing') LIMIT 1",
+                [driver_id],
+            )
+            if affected:
+                emit_ride_status_update(socketio, affected["id"], "driver_online" if online else "driver_offline", driver_id=driver_id)
+        except Exception:
+            pass
+
         return {"message": "online" if online else "offline"}, 200
 
 
@@ -216,6 +231,13 @@ class DriverLocationView(MethodView):
         )
         if updated <= 0:
             abort(500, message="Failed to update location")
+
+        # Emit realtime location update
+        try:
+            socketio = app.extensions["socketio"]
+            emit_driver_location_update(socketio, driver_id, float(loc["lat"]), float(loc["lng"]))
+        except Exception:
+            pass
 
         return {"message": "location_updated"}, 200
 

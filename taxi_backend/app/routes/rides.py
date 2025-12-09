@@ -9,6 +9,8 @@ from marshmallow import Schema, fields, validate, ValidationError
 
 from ..models import query_one, query_all, execute
 from ..services import fare as fare_service
+from .. import app
+from ..realtime.socket import emit_ride_status_update
 
 # Rides Blueprint
 blp = Blueprint(
@@ -296,6 +298,13 @@ class RideCreateView(MethodView):
         if not row:
             abort(500, message="Failed to create ride")
 
+        # Emit ride requested
+        try:
+            socketio = app.extensions["socketio"]
+            emit_ride_status_update(socketio, row["id"], "requested", driver_id=row["driver_id"])
+        except Exception:
+            pass
+
         return {
             "ride_id": row["id"],
             "status": row["status"],
@@ -340,6 +349,13 @@ class AssignDriverView(MethodView):
         driver_id = _assign_driver(ride_id, data.get("strategy", "nearest"), pickup)
         if not driver_id:
             abort(409, message="No driver available or assignment failed")
+
+        # Emit assignment to ride room
+        try:
+            socketio = app.extensions["socketio"]
+            emit_ride_status_update(socketio, ride_id, "assigned", driver_id=driver_id)
+        except Exception:
+            pass
 
         return {"message": "assigned", "driver_id": driver_id}, 200
 
@@ -437,6 +453,13 @@ class RideCancelView(MethodView):
         )
         if updated <= 0:
             abort(409, message="Unable to cancel ride in current state")
+
+        try:
+            socketio = app.extensions["socketio"]
+            emit_ride_status_update(socketio, ride_id, "canceled", driver_id=ride.get("driver_id"))
+        except Exception:
+            pass
+
         return {"message": "canceled"}, 200
 
 
@@ -484,4 +507,11 @@ class RideCompleteView(MethodView):
         )
         if updated <= 0:
             abort(409, message="Unable to complete ride in current state")
+
+        try:
+            socketio = app.extensions["socketio"]
+            emit_ride_status_update(socketio, ride_id, "completed", driver_id=ident.get("id"), extra={"final_fare": final_fare})
+        except Exception:
+            pass
+
         return {"message": "completed", "final_fare": final_fare}, 200
